@@ -2,6 +2,14 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+#define FMNIST_C_PUBLIC_DEC extern "C"
+#define FMNIST_C_PUBLIC_DEF extern "C"
+#else
+#define FMNIST_C_PUBLIC_DEC extern
+#define FMNIST_C_PUBLIC_DEF
+#endif
+
 typedef enum {
     FMNIST_C_RESULT_SUCCESS,
     FMNIST_C_ERROR_CANT_OPEN_FILE,
@@ -11,6 +19,7 @@ typedef enum {
     FMNIST_C_ERROR_INVALID_DATA,
 } FmnistCResult;
 
+FMNIST_C_PUBLIC_DEC
 FmnistCResult
 fmnist_c_dims(
     int64_t* num_train,
@@ -20,6 +29,7 @@ fmnist_c_dims(
     int64_t* num_labels
 );
 
+FMNIST_C_PUBLIC_DEC
 FmnistCResult
 fmnist_c(
     int64_t num_train,

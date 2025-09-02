@@ -257,6 +257,7 @@ _fmnist_load_labels(
     return main_result;
 }
 
+FMNIST_C_PUBLIC_DEF
 FmnistCResult
 fmnist_c_dims(
     int64_t* num_train,
@@ -340,6 +341,7 @@ fmnist_c_dims(
     return result;
 }
 
+FMNIST_C_PUBLIC_DEF
 FmnistCResult
 fmnist_c(
     int64_t num_train,
