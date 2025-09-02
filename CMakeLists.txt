@@ -9,10 +9,10 @@ add_compile_options(
 )
 
 set(INPUT_FILES
-    "${CMAKE_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/train-images-idx3-ubyte.gz"
-    "${CMAKE_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/train-labels-idx1-ubyte.gz"
-    "${CMAKE_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/t10k-images-idx3-ubyte.gz"
-    "${CMAKE_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/t10k-labels-idx1-ubyte.gz"
+    "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/train-images-idx3-ubyte.gz"
+    "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/train-labels-idx1-ubyte.gz"
+    "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/t10k-images-idx3-ubyte.gz"
+    "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fashion-mnist/data/fashion/t10k-labels-idx1-ubyte.gz"
 )
 
 set(OUTPUT_FILES
@@ -22,7 +22,7 @@ set(OUTPUT_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/fmnist/t10k-labels-idx1-ubyte"
 )
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/fmnist)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fmnist)
 
 # Create a loop to generate custom commands for each file
 # Get the length of the input files list
@@ -51,9 +51,6 @@ set(TRAIN_LABELS_FILE "${CMAKE_CURRENT_BINARY_DIR}/fmnist/train-labels-idx1-ubyt
 set(T10K_IMAGES_FILE "${CMAKE_CURRENT_BINARY_DIR}/fmnist/t10k-images-idx3-ubyte")
 set(T10K_LABELS_FILE "${CMAKE_CURRENT_BINARY_DIR}/fmnist/t10k-labels-idx1-ubyte")
 
-# Add a custom target that depends on all the output files
-add_custom_target(unzip_fashion_mnist ALL DEPENDS ${OUTPUT_FILES} ${CMAKE_CURRENT_BINARY_DIR}/fmnist.h)
-
 add_library(
     ${PROJECT_NAME}
     fmnist.c
@@ -64,6 +61,8 @@ target_include_directories(
     PUBLIC
     .
 )
+
+add_custom_target(unzip_fashion_mnist ALL DEPENDS ${OUTPUT_FILES})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_IMAGES_FILE=${TRAIN_IMAGES_FILE}")
 target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_LABELS_FILE=${TRAIN_LABELS_FILE}")

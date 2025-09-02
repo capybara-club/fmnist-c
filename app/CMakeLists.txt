@@ -1,4 +1,4 @@
-project(app)
+project(fmnist-c-app)
 
 add_executable(
     ${PROJECT_NAME}
