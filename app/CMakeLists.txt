@@ -1,11 +1,2 @@
-project(fmnist-c-app)
-
-add_executable(
-    ${PROJECT_NAME}
-    main.c
-)
-
-target_link_libraries(
-    ${PROJECT_NAME}
-    fmnist_c
-)
+add_subdirectory(u8_u8)
+add_subdirectory(f32_f32)

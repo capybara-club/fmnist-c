@@ -92,11 +92,12 @@ static
 inline
 FmnistCResult
 __fmnist_load_data(
+    FmnistCPixelFormat pixel_format,
     _FmnistCMRead mr_data,
     int64_t* num_samples_ref,
     int64_t* num_rows_ref,
     int64_t* num_cols_ref,
-    float* data,
+    void* data,
     int64_t data_ld
 ) {
     uint8_t *mapped_data = mr_data.mapped_data;
@@ -127,27 +128,47 @@ __fmnist_load_data(
         return FMNIST_C_ERROR_INVALID_DATA;
     }
 
-    uint8_t* data_ptr = (uint8_t*)data_u32;
-    int64_t D = num_cols * num_rows;
-    for (int64_t n = 0; n < *num_samples_ref; n++) {
-        for (int64_t d = 0; d < D; d++) {
-            uint8_t pixel = data_ptr[n * D + d];
-            data[d * data_ld + n] = (float)pixel / 255.0f;
-        }
+    switch (pixel_format) {
+        case FMNIST_C_PIXEL_FORMAT_FLOAT: {
+            float* out_ptr = (float*)data;
+            uint8_t* data_ptr = (uint8_t*)data_u32;
+            int64_t D = num_cols * num_rows;
+            for (int64_t n = 0; n < *num_samples_ref; n++) {
+                for (int64_t d = 0; d < D; d++) {
+                    uint8_t pixel = data_ptr[n * D + d];
+                    out_ptr[d * data_ld + n] = (float)pixel / 255.0f;
+                }
+            }
+            return FMNIST_C_RESULT_SUCCESS;
+        } break;
+        case FMNIST_C_PIXEL_FORMAT_UINT8: {
+            uint8_t* out_ptr = (uint8_t*)data;
+            uint8_t* data_ptr = (uint8_t*)data_u32;
+            int64_t D = num_cols * num_rows;
+            for (int64_t n = 0; n < *num_samples_ref; n++) {
+                for (int64_t d = 0; d < D; d++) {
+                    uint8_t pixel = data_ptr[n * D + d];
+                    out_ptr[d * data_ld + n] = pixel;
+                }
+            }
+            return FMNIST_C_RESULT_SUCCESS;
+        } break;
     }
+    return FMNIST_C_ERROR_INVALID_DATA;
 
-    return FMNIST_C_RESULT_SUCCESS;
+
 }
 
 static
 inline
 FmnistCResult
 _fmnist_load_data(
+    FmnistCPixelFormat pixel_format,
     const char* data_path,
     int64_t* num_samples,
     int64_t* num_rows,
     int64_t* num_cols,
-    float* data,
+    void* data,
     int64_t data_ld
 ) {
     FmnistCResult result;
@@ -160,6 +181,7 @@ _fmnist_load_data(
 
     FmnistCResult main_result = 
         __fmnist_load_data(
+            pixel_format,
             mr_data, num_samples, num_rows, num_cols,
             data, data_ld
         );
@@ -178,10 +200,11 @@ static
 inline
 FmnistCResult
 __fmnist_load_labels(
+    FmnistCLabelFormat label_format,
     _FmnistCMRead mr_labels,
     int64_t* num_samples_ref,
     int64_t* num_labels_ref,
-    float* label_data,
+    void* label_data,
     int64_t label_data_ld
 ) {
     uint8_t *mapped_data = mr_labels.mapped_data;
@@ -212,25 +235,39 @@ __fmnist_load_labels(
         return FMNIST_C_ERROR_INVALID_DATA;
     }
 
-    for (int64_t l = 0; l < *num_labels_ref; l++) {
-        for (int64_t n = 0; n < *num_samples_ref; n++) {
-            int64_t label_v = labels[n];
-            float v = l == label_v ? 1.0f : 0.0f;
-            label_data[l * label_data_ld + n] = v;
-        }
+    switch (label_format) {
+        case FMNIST_C_LABEL_FORMAT_UINT8: {
+            uint8_t* out_label_data_ptr = (uint8_t*)label_data;
+            for (int64_t i = 0; i < *num_samples_ref; i++) {
+                uint8_t label = labels[i];
+                out_label_data_ptr[i] = label;
+            }
+            return FMNIST_C_RESULT_SUCCESS;
+        } break;
+        case FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT: {
+            float* out_label_data_ptr = (float*)label_data;
+            for (int64_t l = 0; l < *num_labels_ref; l++) {
+                for (int64_t n = 0; n < *num_samples_ref; n++) {
+                    int64_t label_v = labels[n];
+                    float v = l == label_v ? 1.0f : 0.0f;
+                    out_label_data_ptr[l * label_data_ld + n] = v;
+                }
+            }
+            return FMNIST_C_RESULT_SUCCESS;
+        } break;
     }
-
-    return FMNIST_C_RESULT_SUCCESS;
+    return FMNIST_C_ERROR_INVALID_DATA;
 }
 
 static
 inline
 FmnistCResult
 _fmnist_load_labels(
+    FmnistCLabelFormat label_format,
     const char* data_path,
     int64_t* num_samples,
     int64_t* num_labels,
-    float* label_data, 
+    void* label_data, 
     int64_t label_data_ld
 ) {
     FmnistCResult result;
@@ -243,6 +280,7 @@ _fmnist_load_labels(
 
     FmnistCResult main_result = 
         __fmnist_load_labels(
+            label_format,
             mr_labels, num_samples, num_labels,
             label_data, label_data_ld
         );
@@ -270,6 +308,7 @@ fmnist_c_dims(
     int64_t x_train_num_samples, x_train_num_rows, x_train_num_cols; 
     result = 
         _fmnist_load_data(
+            FMNIST_C_PIXEL_FORMAT_FLOAT,
             _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE),
             &x_train_num_samples, 
             &x_train_num_rows,
@@ -283,6 +322,7 @@ fmnist_c_dims(
     int64_t y_train_num_samples, y_train_num_labels; 
     result = 
         _fmnist_load_labels(
+            FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT,
             _FMNIST_C_XSTRING(TRAIN_LABELS_FILE),
             &y_train_num_samples,
             &y_train_num_labels,
@@ -295,6 +335,7 @@ fmnist_c_dims(
     int64_t x_test_num_samples, x_test_num_rows, x_test_num_cols; 
     result = 
         _fmnist_load_data(
+            FMNIST_C_PIXEL_FORMAT_FLOAT,
             _FMNIST_C_XSTRING(T10K_IMAGES_FILE),
             &x_test_num_samples, 
             &x_test_num_rows, 
@@ -308,6 +349,7 @@ fmnist_c_dims(
     int64_t y_test_num_samples, y_test_num_labels; 
     result = 
         _fmnist_load_labels(
+            FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT,
             _FMNIST_C_XSTRING(T10K_LABELS_FILE),
             &y_test_num_samples, 
             &y_test_num_labels,
@@ -343,35 +385,46 @@ fmnist_c_dims(
 
 FMNIST_C_PUBLIC_DEF
 FmnistCResult
-fmnist_c(
+fmnist_c_load(
+    FmnistCPixelFormat pixel_format,
+    FmnistCLabelFormat label_format,
     int64_t num_train,
     int64_t num_test,
     int64_t num_rows,
     int64_t num_cols,
     int64_t num_labels,
-    float* x_train, int64_t x_train_ld,
-    float* y_train, int64_t y_train_ld,
-    float* x_test,  int64_t x_test_ld,
-    float* y_test,  int64_t y_test_ld
+    void* x_train, int64_t x_train_ld,
+    void* y_train, int64_t y_train_ld,
+    void* x_test,  int64_t x_test_ld,
+    void* y_test,  int64_t y_test_ld
 ) {
     FmnistCResult result;
 
     if (x_train_ld < num_train) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
-    if (y_train_ld < num_train) {
+    if (label_format == FMNIST_C_LABEL_FORMAT_UINT8) {
+        if (y_train_ld != 1) {
+            return FMNIST_C_ERROR_INVALID_DATA;
+        }
+    } else if (y_train_ld < num_train) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
     if (x_test_ld < num_test) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
-    if (y_test_ld < num_test) {
+    if (label_format == FMNIST_C_LABEL_FORMAT_UINT8) {
+        if (y_test_ld != 1) {
+            return FMNIST_C_ERROR_INVALID_DATA;
+        }
+    } else if (y_test_ld < num_test) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
 
     if (x_train != NULL) {
         result = 
             _fmnist_load_data(
+                pixel_format,
                 _fmnist_x_train_data_path,
                 &num_train, 
                 &num_rows,
@@ -386,6 +439,7 @@ fmnist_c(
     if (y_train != NULL) {
         result = 
             _fmnist_load_labels(
+                label_format,
                 _fmnist_y_train_data_path,
                 &num_train,
                 &num_labels,
@@ -399,6 +453,7 @@ fmnist_c(
     if (x_test != NULL) {
         result = 
             _fmnist_load_data(
+                pixel_format,
                 _fmnist_x_test_data_path,
                 &num_test, 
                 &num_rows,
@@ -413,6 +468,7 @@ fmnist_c(
     if (y_test != NULL) {
         result = 
             _fmnist_load_labels(
+                label_format,
                 _fmnist_y_test_data_path,
                 &num_test,
                 &num_labels,
