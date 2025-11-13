@@ -47,34 +47,43 @@ main() {
     float* y_train; 
     float* x_test;
     float* y_test;
-    int64_t x_train_ld = num_train;
-    int64_t y_train_ld = num_train;
-    int64_t x_test_ld = num_test;
-    int64_t y_test_ld = num_test;
 
-    x_train = malloc(x_train_ld * num_rows * num_cols * sizeof(float));
-    y_train = malloc(y_train_ld * num_labels * sizeof(float));
-    x_test = malloc(x_test_ld * num_rows * num_cols * sizeof(float));
-    y_test = malloc(y_test_ld * num_labels * sizeof(float));
+    x_train = malloc(num_train * num_rows * num_cols * sizeof(float));
+    y_train = malloc(num_train * num_labels * sizeof(float));
+    x_test = malloc(num_test * num_rows * num_cols * sizeof(float));
+    y_test = malloc(num_test * num_labels * sizeof(float));
 
-    result = fmnist_c_load(
-        FMNIST_C_PIXEL_FORMAT_FLOAT,
-        FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT,
+    result = fmnist_c_load_images_f32(
+        true,
         num_train, 
-        num_test,
+        num_train,
         num_rows, 
-        num_cols, 
-        num_labels,
-        x_train, x_train_ld,
-        y_train, y_train_ld,
-        x_test, x_test_ld,
-        y_test, y_test_ld
+        num_cols,
+        num_train * num_rows * num_cols,
+        x_train,
+        num_rows * num_cols,
+        num_cols,
+        1
     );
     if (result != FMNIST_C_RESULT_SUCCESS) {
         printf("Failed to load fmnist data\n");
     }
 
-    #define IMAGE_NUM 80
+    result = fmnist_c_load_labels_onehot_f32(
+        true,
+        num_train, 
+        num_train,
+        num_labels,
+        num_train * num_labels,
+        y_train,
+        num_labels,
+        1
+    );
+    if (result != FMNIST_C_RESULT_SUCCESS) {
+        printf("Failed to load fmnist data\n");
+    }
+
+    #define IMAGE_NUM 29
     int stb_result;
 
     uint8_t* single_image = (uint8_t*)malloc(num_rows * num_cols * sizeof(uint8_t));
@@ -83,8 +92,9 @@ main() {
         // Cleanup and exit...
     }
 
+    float* image_ptr = x_train + num_rows * num_cols * IMAGE_NUM;
     for (int64_t l = 0; l < num_rows * num_cols; l++) {
-        float pixel_f32 = x_train[l * x_train_ld + IMAGE_NUM];
+        float pixel_f32 = image_ptr[l];
         uint8_t pixel_u8 = (uint8_t)(pixel_f32 * 255.0f);
         single_image[l] = pixel_u8;
     }
@@ -95,31 +105,12 @@ main() {
         printf("Failed to write PNG\n");
     }
 
+    float* label_ptr = y_train + IMAGE_NUM * num_labels;
     for (int64_t l = 0; l < num_labels; l++) {
-        float label_f32 = y_train[l * y_train_ld + IMAGE_NUM];
+        float label_f32 = label_ptr[l];
         int label = (int)label_f32;
         if (label == 1) {
             printf("train: %s\n", label_strings[l]);
-        }
-    }
-
-    for (int64_t l = 0; l < num_rows * num_cols; l++) {
-        float pixel_f32 = x_test[l * x_test_ld + IMAGE_NUM];
-        uint8_t pixel_u8 = (uint8_t)(pixel_f32 * 255.0f);
-        single_image[l] = pixel_u8;
-    }
-
-    // Now write the single image
-    stb_result = stbi_write_png( XSTRING(CMAKE_SOURCE_PATH) "/output_uint8_x_test.png", num_cols, num_rows, 1, single_image, num_cols * 1);
-    if (stb_result == 0) {
-        printf("Failed to write PNG\n");
-    }
-
-    for (int64_t l = 0; l < num_labels; l++) {
-        float label_f32 = y_test[l * y_test_ld + IMAGE_NUM];
-        int label = (int)label_f32;
-        if (label == 1) {
-            printf("test: %s\n", label_strings[l]);
         }
     }
 

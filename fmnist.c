@@ -15,11 +15,6 @@
 
 #define _FMNIST_C_MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static const char* _fmnist_x_train_data_path =  _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE);
-static const char* _fmnist_y_train_data_path =  _FMNIST_C_XSTRING(TRAIN_LABELS_FILE);
-static const char* _fmnist_x_test_data_path =   _FMNIST_C_XSTRING(T10K_IMAGES_FILE);
-static const char* _fmnist_y_test_data_path =   _FMNIST_C_XSTRING(T10K_LABELS_FILE);
-
 typedef struct {
 	uint8_t* mapped_data;
 	size_t mapped_size;
@@ -92,13 +87,17 @@ static
 inline
 FmnistCResult
 __fmnist_load_data(
-    FmnistCPixelFormat pixel_format,
     _FmnistCMRead mr_data,
+    int64_t num_samples_requested,
     int64_t* num_samples_ref,
     int64_t* num_rows_ref,
     int64_t* num_cols_ref,
-    void* data,
-    int64_t data_ld
+    int64_t dest_num_elements,
+    void* dest,
+    int64_t dest_stride_N,
+    int64_t dest_stride_H, 
+    int64_t dest_stride_W,
+    bool is_u8
 ) {
     uint8_t *mapped_data = mr_data.mapped_data;
     uint32_t *data_u32 = (uint32_t*)mapped_data;
@@ -111,14 +110,14 @@ __fmnist_load_data(
     int64_t num_rows = _fmnist_c_swap_endian(*data_u32++);
     int64_t num_cols = _fmnist_c_swap_endian(*data_u32++);
 
-    if (data == NULL) {
+    if (dest == NULL) {
         *num_samples_ref = num_samples;
         *num_rows_ref = num_rows;
         *num_cols_ref = num_cols;
         return FMNIST_C_RESULT_SUCCESS;
     }
 
-    if (*num_samples_ref > num_samples) {
+    if (*num_samples_ref != num_samples) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
     if (*num_rows_ref != num_rows) {
@@ -127,49 +126,61 @@ __fmnist_load_data(
     if (*num_cols_ref != num_cols) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
-
-    switch (pixel_format) {
-        case FMNIST_C_PIXEL_FORMAT_FLOAT: {
-            float* out_ptr = (float*)data;
-            uint8_t* data_ptr = (uint8_t*)data_u32;
-            int64_t D = num_cols * num_rows;
-            for (int64_t n = 0; n < *num_samples_ref; n++) {
-                for (int64_t d = 0; d < D; d++) {
-                    uint8_t pixel = data_ptr[n * D + d];
-                    out_ptr[d * data_ld + n] = (float)pixel / 255.0f;
-                }
-            }
-            return FMNIST_C_RESULT_SUCCESS;
-        } break;
-        case FMNIST_C_PIXEL_FORMAT_UINT8: {
-            uint8_t* out_ptr = (uint8_t*)data;
-            uint8_t* data_ptr = (uint8_t*)data_u32;
-            int64_t D = num_cols * num_rows;
-            for (int64_t n = 0; n < *num_samples_ref; n++) {
-                for (int64_t d = 0; d < D; d++) {
-                    uint8_t pixel = data_ptr[n * D + d];
-                    out_ptr[d * data_ld + n] = pixel;
-                }
-            }
-            return FMNIST_C_RESULT_SUCCESS;
-        } break;
+    if (num_samples_requested > num_samples) {
+        return FMNIST_C_ERROR_INVALID_DATA;
     }
-    return FMNIST_C_ERROR_INVALID_DATA;
 
+    if (is_u8) {
+        uint8_t* out_ptr = (uint8_t*)dest;
+        uint8_t* data_ptr = (uint8_t*)data_u32;
+        for (int64_t n = 0; n < num_samples; n++) {
+            for (int64_t col = 0; col < num_cols; col++) {
+                for (int64_t row = 0; row < num_rows; row++) {
+                    uint8_t pixel = data_ptr[n * num_rows * num_cols + row * num_cols + col];
+                    int64_t idx = n * dest_stride_N + col * dest_stride_W + row * dest_stride_H;
+                    if (idx >= dest_num_elements) {
+                        return FMNIST_C_ERROR_INSUFFICIENT_DEST;
+                    }
+                    out_ptr[idx] = pixel;
+                }
+            }
+        }
+        return FMNIST_C_RESULT_SUCCESS;
+    }
 
+    float* out_ptr = (float*)dest;
+    uint8_t* data_ptr = (uint8_t*)data_u32;
+    for (int64_t n = 0; n < num_samples; n++) {
+        for (int64_t col = 0; col < num_cols; col++) {
+            for (int64_t row = 0; row < num_rows; row++) {
+                uint8_t pixel = data_ptr[n * num_rows * num_cols + row * num_cols + col];
+                float pixel_f32 = (float)pixel / 255.0f;
+                int64_t idx = n * dest_stride_N + col * dest_stride_W + row * dest_stride_H;
+                if (idx >= dest_num_elements) {
+                    return FMNIST_C_ERROR_INSUFFICIENT_DEST;
+                }
+                out_ptr[idx] = pixel_f32;
+            }
+        }
+    }
+    return FMNIST_C_RESULT_SUCCESS;
 }
 
 static
 inline
 FmnistCResult
 _fmnist_load_data(
-    FmnistCPixelFormat pixel_format,
     const char* data_path,
+    int64_t num_samples_requested,
     int64_t* num_samples,
     int64_t* num_rows,
     int64_t* num_cols,
+    int64_t dest_elements,
     void* data,
-    int64_t data_ld
+    int64_t dest_stride_N,
+    int64_t dest_stride_H, 
+    int64_t dest_stride_W,
+    bool is_u8
 ) {
     FmnistCResult result;
     _FmnistCMRead mr_data;
@@ -181,9 +192,17 @@ _fmnist_load_data(
 
     FmnistCResult main_result = 
         __fmnist_load_data(
-            pixel_format,
-            mr_data, num_samples, num_rows, num_cols,
-            data, data_ld
+            mr_data, 
+            num_samples_requested,
+            num_samples, 
+            num_rows, 
+            num_cols,
+            dest_elements,
+            data,
+            dest_stride_N,
+            dest_stride_H,
+            dest_stride_W,
+            is_u8
         );
 
     result = _fmnist_c_mmap_file_close(mr_data);
@@ -200,12 +219,15 @@ static
 inline
 FmnistCResult
 __fmnist_load_labels(
-    FmnistCLabelFormat label_format,
     _FmnistCMRead mr_labels,
+    int64_t num_samples_requested,
     int64_t* num_samples_ref,
     int64_t* num_labels_ref,
-    void* label_data,
-    int64_t label_data_ld
+    int64_t dest_elements,
+    void* dest,
+    int64_t dest_stride_N, 
+    int64_t dest_stride_C,
+    bool is_u8
 ) {
     uint8_t *mapped_data = mr_labels.mapped_data;
     uint32_t *labels_u32 = (uint32_t*)mapped_data;
@@ -222,7 +244,7 @@ __fmnist_load_labels(
 	}
 	(num_labels)++;
 
-    if (label_data == NULL) {
+    if (dest == NULL) {
         *num_samples_ref = num_samples;
         *num_labels_ref = num_labels;
         return FMNIST_C_RESULT_SUCCESS;
@@ -231,44 +253,55 @@ __fmnist_load_labels(
     if (*num_samples_ref > num_samples) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
+
     if (*num_labels_ref != num_labels) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
 
-    switch (label_format) {
-        case FMNIST_C_LABEL_FORMAT_UINT8: {
-            uint8_t* out_label_data_ptr = (uint8_t*)label_data;
-            for (int64_t i = 0; i < *num_samples_ref; i++) {
-                uint8_t label = labels[i];
-                out_label_data_ptr[i] = label;
-            }
-            return FMNIST_C_RESULT_SUCCESS;
-        } break;
-        case FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT: {
-            float* out_label_data_ptr = (float*)label_data;
-            for (int64_t l = 0; l < *num_labels_ref; l++) {
-                for (int64_t n = 0; n < *num_samples_ref; n++) {
-                    int64_t label_v = labels[n];
-                    float v = l == label_v ? 1.0f : 0.0f;
-                    out_label_data_ptr[l * label_data_ld + n] = v;
-                }
-            }
-            return FMNIST_C_RESULT_SUCCESS;
-        } break;
+    if (num_samples_requested > num_samples) {
+        return FMNIST_C_ERROR_INVALID_DATA;
     }
-    return FMNIST_C_ERROR_INVALID_DATA;
+
+    if (is_u8) {
+        uint8_t* out_label_data_ptr = (uint8_t*)dest;
+        for (int64_t i = 0; i < *num_samples_ref; i++) {
+            uint8_t label = labels[i];
+            if (i >= dest_elements) {
+                return FMNIST_C_ERROR_INSUFFICIENT_DEST;
+            }
+            out_label_data_ptr[i] = label;
+        }
+        return FMNIST_C_RESULT_SUCCESS;
+    }
+
+    float* out_label_data_ptr = (float*)dest;
+        for (int64_t l = 0; l < *num_labels_ref; l++) {
+            for (int64_t n = 0; n < *num_samples_ref; n++) {
+                int64_t label_v = labels[n];
+                float v = l == label_v ? 1.0f : 0.0f;
+                int64_t idx = l * dest_stride_C + n * dest_stride_N;
+                if (idx >= dest_elements) {
+                    return FMNIST_C_ERROR_INSUFFICIENT_DEST;
+                }
+                out_label_data_ptr[idx] = v;
+            }
+        }
+        return FMNIST_C_RESULT_SUCCESS;
 }
 
 static
 inline
 FmnistCResult
 _fmnist_load_labels(
-    FmnistCLabelFormat label_format,
     const char* data_path,
+    int64_t num_samples_requested,
     int64_t* num_samples,
     int64_t* num_labels,
-    void* label_data, 
-    int64_t label_data_ld
+    int64_t dest_elements,
+    void* dest,
+    int64_t dest_stride_N, 
+    int64_t dest_stride_C,
+    bool one_hot
 ) {
     FmnistCResult result;
     _FmnistCMRead mr_labels;
@@ -280,9 +313,15 @@ _fmnist_load_labels(
 
     FmnistCResult main_result = 
         __fmnist_load_labels(
-            label_format,
-            mr_labels, num_samples, num_labels,
-            label_data, label_data_ld
+            mr_labels, 
+            num_samples_requested,
+            num_samples, 
+            num_labels,
+            dest_elements,
+            dest,
+            dest_stride_N,
+            dest_stride_C,
+            one_hot
         );
 
     result = _fmnist_c_mmap_file_close(mr_labels);
@@ -308,12 +347,17 @@ fmnist_c_dims(
     int64_t x_train_num_samples, x_train_num_rows, x_train_num_cols; 
     result = 
         _fmnist_load_data(
-            FMNIST_C_PIXEL_FORMAT_FLOAT,
             _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE),
+            0,
             &x_train_num_samples, 
             &x_train_num_rows,
             &x_train_num_cols,
-            NULL, 0
+            0,
+            NULL, 
+            0,
+            0,
+            0,
+            true
         );
     if (result != FMNIST_C_RESULT_SUCCESS) {
         return result;
@@ -322,11 +366,15 @@ fmnist_c_dims(
     int64_t y_train_num_samples, y_train_num_labels; 
     result = 
         _fmnist_load_labels(
-            FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT,
             _FMNIST_C_XSTRING(TRAIN_LABELS_FILE),
+            0,
             &y_train_num_samples,
             &y_train_num_labels,
-            NULL, 0
+            0,
+            NULL,
+            0,
+            0,
+            true
         );
     if (result != FMNIST_C_RESULT_SUCCESS) {
         return result;
@@ -335,12 +383,17 @@ fmnist_c_dims(
     int64_t x_test_num_samples, x_test_num_rows, x_test_num_cols; 
     result = 
         _fmnist_load_data(
-            FMNIST_C_PIXEL_FORMAT_FLOAT,
             _FMNIST_C_XSTRING(T10K_IMAGES_FILE),
+            0,
             &x_test_num_samples, 
             &x_test_num_rows, 
             &x_test_num_cols,
-            NULL, 0
+            0,
+            NULL, 
+            0,
+            0,
+            0,
+            true
         );
     if (result != FMNIST_C_RESULT_SUCCESS) {
         return result;
@@ -349,11 +402,15 @@ fmnist_c_dims(
     int64_t y_test_num_samples, y_test_num_labels; 
     result = 
         _fmnist_load_labels(
-            FMNIST_C_LABEL_FORMAT_ONEHOT_FLOAT,
             _FMNIST_C_XSTRING(T10K_LABELS_FILE),
+            0,
             &y_test_num_samples, 
             &y_test_num_labels,
-            NULL, 0
+            0,
+            NULL,
+            0,
+            0,
+            true
         );
     if (result != FMNIST_C_RESULT_SUCCESS) {
         return result;
@@ -385,99 +442,111 @@ fmnist_c_dims(
 
 FMNIST_C_PUBLIC_DEF
 FmnistCResult
-fmnist_c_load(
-    FmnistCPixelFormat pixel_format,
-    FmnistCLabelFormat label_format,
-    int64_t num_train,
-    int64_t num_test,
-    int64_t num_rows,
-    int64_t num_cols,
-    int64_t num_labels,
-    void* x_train, int64_t x_train_ld,
-    void* y_train, int64_t y_train_ld,
-    void* x_test,  int64_t x_test_ld,
-    void* y_test,  int64_t y_test_ld
+fmnist_c_load_images_f32(
+    bool is_train, 
+    int64_t num_samples, 
+    int64_t expected_N,
+    int64_t expected_H, 
+    int64_t expected_W, 
+    int64_t dest_elements,
+    float* dest, 
+    int64_t dest_stride_N,
+    int64_t dest_stride_H, 
+    int64_t dest_stride_W
 ) {
-    FmnistCResult result;
+    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE) : _FMNIST_C_XSTRING(T10K_IMAGES_FILE);
+    return _fmnist_load_data(
+        path,
+        num_samples,
+        &expected_N,
+        &expected_H,
+        &expected_W,
+        dest_elements,
+        dest,
+        dest_stride_N,
+        dest_stride_H,
+        dest_stride_W,
+        false
+    );
+}
 
-    if (x_train_ld < num_train) {
-        return FMNIST_C_ERROR_INVALID_DATA;
-    }
-    if (label_format == FMNIST_C_LABEL_FORMAT_UINT8) {
-        if (y_train_ld != 1) {
-            return FMNIST_C_ERROR_INVALID_DATA;
-        }
-    } else if (y_train_ld < num_train) {
-        return FMNIST_C_ERROR_INVALID_DATA;
-    }
-    if (x_test_ld < num_test) {
-        return FMNIST_C_ERROR_INVALID_DATA;
-    }
-    if (label_format == FMNIST_C_LABEL_FORMAT_UINT8) {
-        if (y_test_ld != 1) {
-            return FMNIST_C_ERROR_INVALID_DATA;
-        }
-    } else if (y_test_ld < num_test) {
-        return FMNIST_C_ERROR_INVALID_DATA;
-    }
+FMNIST_C_PUBLIC_DEF
+FmnistCResult
+fmnist_c_load_images_u8(
+    bool is_train, 
+    int64_t num_samples, 
+    int64_t expected_N,
+    int64_t expected_H, 
+    int64_t expected_W, 
+    int64_t dest_elements,
+    uint8_t* dest, 
+    int64_t dest_stride_N,
+    int64_t dest_stride_H, 
+    int64_t dest_stride_W
+) {
+    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE) : _FMNIST_C_XSTRING(T10K_IMAGES_FILE);
+    return _fmnist_load_data(
+        path,
+        num_samples,
+        &expected_N,
+        &expected_H,
+        &expected_W,
+        dest_elements,
+        dest,
+        dest_stride_N,
+        dest_stride_H,
+        dest_stride_W,
+        true
+    );
+}
 
-    if (x_train != NULL) {
-        result = 
-            _fmnist_load_data(
-                pixel_format,
-                _fmnist_x_train_data_path,
-                &num_train, 
-                &num_rows,
-                &num_cols,
-                x_train, x_train_ld
-            );
-        if (result != FMNIST_C_RESULT_SUCCESS) {
-            return result;
-        }
-    }
+FMNIST_C_PUBLIC_DEC
+FmnistCResult
+fmnist_c_load_labels_u8(
+    bool is_train, 
+    int64_t num_samples, 
+    int64_t expected_N,
+    int64_t expected_C,
+    int64_t dest_elements,
+    uint8_t* dest, 
+    int64_t dest_stride_N
+) {
+    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_LABELS_FILE) : _FMNIST_C_XSTRING(T10K_LABELS_FILE);
+    return _fmnist_load_labels(
+        path,
+        num_samples,
+        &expected_N,
+        &expected_C,
+        dest_elements,
+        dest,
+        dest_stride_N,
+        1,
+        true
+    );
+}
 
-    if (y_train != NULL) {
-        result = 
-            _fmnist_load_labels(
-                label_format,
-                _fmnist_y_train_data_path,
-                &num_train,
-                &num_labels,
-                y_train, y_train_ld
-            );
-        if (result != FMNIST_C_RESULT_SUCCESS) {
-            return result;
-        }
-    }
-
-    if (x_test != NULL) {
-        result = 
-            _fmnist_load_data(
-                pixel_format,
-                _fmnist_x_test_data_path,
-                &num_test, 
-                &num_rows,
-                &num_cols,
-                x_test, x_test_ld
-            );
-        if (result != FMNIST_C_RESULT_SUCCESS) {
-            return result;
-        }
-    }
-
-    if (y_test != NULL) {
-        result = 
-            _fmnist_load_labels(
-                label_format,
-                _fmnist_y_test_data_path,
-                &num_test,
-                &num_labels,
-                y_test, y_test_ld
-            );
-        if (result != FMNIST_C_RESULT_SUCCESS) {
-            return result;
-        }
-    }
-
-    return FMNIST_C_RESULT_SUCCESS;
+FMNIST_C_PUBLIC_DEC
+FmnistCResult
+fmnist_c_load_labels_onehot_f32(
+    bool is_train, 
+    int64_t num_samples, 
+    int64_t expected_N,
+    int64_t expected_C,
+    int64_t dest_elements,
+    float* dest, 
+    int64_t dest_stride_N,
+    int64_t dest_stride_C
+) {
+    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_LABELS_FILE) : _FMNIST_C_XSTRING(T10K_LABELS_FILE);
+    return _fmnist_load_labels(
+        path,
+        num_samples,
+        &expected_N,
+        &expected_C,
+        dest_elements,
+        dest,
+        dest_stride_N,
+        dest_stride_C,
+        false
+    );
 }
