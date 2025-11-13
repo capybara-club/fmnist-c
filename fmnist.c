@@ -3,9 +3,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <sys/mman.h>
-#include <sys/mman.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -14,6 +13,10 @@
 #define _FMNIST_C_XSTRING(x) _FMNIST_C_STRING(x)
 
 #define _FMNIST_C_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define FMNIST_IMAGE_MAGIC 2051
+#define FMNIST_LABEL_MAGIC 2049
+
 
 typedef struct {
 	uint8_t* mapped_data;
@@ -44,10 +47,10 @@ _fmnist_c_mmap_file_open_ro(
 
 	mapped_size = statbuf.st_size;
 	mapped_data = (uint8_t*)mmap( NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0 );
+	close( fd );
 	if (mapped_data == MAP_FAILED) {
 		return FMNIST_C_ERROR_CANT_MMAP_FILE;
 	}
-	close( fd );
 
     *m_read_out = (_FmnistCMRead) {
         .mapped_data = mapped_data,
@@ -102,7 +105,7 @@ __fmnist_load_data(
     uint8_t *mapped_data = mr_data.mapped_data;
     uint32_t *data_u32 = (uint32_t*)mapped_data;
 
-    if (_fmnist_c_swap_endian(*data_u32++) != 2051) {
+    if (_fmnist_c_swap_endian(*data_u32++) != FMNIST_IMAGE_MAGIC) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
 
@@ -133,9 +136,9 @@ __fmnist_load_data(
     if (is_u8) {
         uint8_t* out_ptr = (uint8_t*)dest;
         uint8_t* data_ptr = (uint8_t*)data_u32;
-        for (int64_t n = 0; n < num_samples; n++) {
-            for (int64_t col = 0; col < num_cols; col++) {
-                for (int64_t row = 0; row < num_rows; row++) {
+        for (int64_t n = 0; n < num_samples_requested; n++) {
+            for (int64_t row = 0; row < num_rows; row++) {
+                for (int64_t col = 0; col < num_cols; col++) {
                     uint8_t pixel = data_ptr[n * num_rows * num_cols + row * num_cols + col];
                     int64_t idx = n * dest_stride_N + col * dest_stride_W + row * dest_stride_H;
                     if (idx >= dest_num_elements) {
@@ -150,9 +153,9 @@ __fmnist_load_data(
 
     float* out_ptr = (float*)dest;
     uint8_t* data_ptr = (uint8_t*)data_u32;
-    for (int64_t n = 0; n < num_samples; n++) {
-        for (int64_t col = 0; col < num_cols; col++) {
-            for (int64_t row = 0; row < num_rows; row++) {
+    for (int64_t n = 0; n < num_samples_requested; n++) {
+        for (int64_t row = 0; row < num_rows; row++) {
+            for (int64_t col = 0; col < num_cols; col++) {
                 uint8_t pixel = data_ptr[n * num_rows * num_cols + row * num_cols + col];
                 float pixel_f32 = (float)pixel / 255.0f;
                 int64_t idx = n * dest_stride_N + col * dest_stride_W + row * dest_stride_H;
@@ -232,7 +235,7 @@ __fmnist_load_labels(
     uint8_t *mapped_data = mr_labels.mapped_data;
     uint32_t *labels_u32 = (uint32_t*)mapped_data;
     
-    if (_fmnist_c_swap_endian(*labels_u32++) != 2049) {
+    if (_fmnist_c_swap_endian(*labels_u32++) != FMNIST_LABEL_MAGIC) {
         return FMNIST_C_ERROR_INVALID_DATA;
     }
     
@@ -264,19 +267,19 @@ __fmnist_load_labels(
 
     if (is_u8) {
         uint8_t* out_label_data_ptr = (uint8_t*)dest;
-        for (int64_t i = 0; i < *num_samples_ref; i++) {
+        for (int64_t i = 0; i < num_samples_requested; i++) {
             uint8_t label = labels[i];
             if (i >= dest_elements) {
                 return FMNIST_C_ERROR_INSUFFICIENT_DEST;
             }
-            out_label_data_ptr[i] = label;
+            out_label_data_ptr[i * dest_stride_N] = label;
         }
         return FMNIST_C_RESULT_SUCCESS;
     }
 
     float* out_label_data_ptr = (float*)dest;
         for (int64_t l = 0; l < *num_labels_ref; l++) {
-            for (int64_t n = 0; n < *num_samples_ref; n++) {
+            for (int64_t n = 0; n < num_samples_requested; n++) {
                 int64_t label_v = labels[n];
                 float v = l == label_v ? 1.0f : 0.0f;
                 int64_t idx = l * dest_stride_C + n * dest_stride_N;
@@ -301,7 +304,7 @@ _fmnist_load_labels(
     void* dest,
     int64_t dest_stride_N, 
     int64_t dest_stride_C,
-    bool one_hot
+    bool is_u8
 ) {
     FmnistCResult result;
     _FmnistCMRead mr_labels;
@@ -321,7 +324,7 @@ _fmnist_load_labels(
             dest,
             dest_stride_N,
             dest_stride_C,
-            one_hot
+            is_u8
         );
 
     result = _fmnist_c_mmap_file_close(mr_labels);
@@ -500,7 +503,7 @@ fmnist_c_load_images_u8(
     );
 }
 
-FMNIST_C_PUBLIC_DEC
+FMNIST_C_PUBLIC_DEF
 FmnistCResult
 fmnist_c_load_labels_u8(
     bool is_train, 
@@ -525,7 +528,7 @@ fmnist_c_load_labels_u8(
     );
 }
 
-FMNIST_C_PUBLIC_DEC
+FMNIST_C_PUBLIC_DEF
 FmnistCResult
 fmnist_c_load_labels_onehot_f32(
     bool is_train, 
