@@ -38,10 +38,6 @@ FmnistCResult
 fmnist_c_load_images_f32(
     bool is_train, 
     int64_t num_samples, 
-    int64_t expected_N,
-    int64_t expected_H, 
-    int64_t expected_W, 
-    int64_t dest_elements,
     float* dest, 
     int64_t dest_stride_N,
     int64_t dest_stride_H, 
@@ -54,10 +50,6 @@ FmnistCResult
 fmnist_c_load_images_u8(
     bool is_train, 
     int64_t num_samples, 
-    int64_t expected_N,
-    int64_t expected_H, 
-    int64_t expected_W, 
-    int64_t dest_elements,
     uint8_t* dest,
     int64_t dest_stride_N, 
     int64_t dest_stride_H,
@@ -69,10 +61,7 @@ FMNIST_C_PUBLIC_DEC
 FmnistCResult
 fmnist_c_load_labels_u8(
     bool is_train, 
-    int64_t num_samples, 
-    int64_t expected_N,
-    int64_t expected_C,
-    int64_t dest_elements,
+    int64_t num_samples,
     uint8_t* dest, 
     int64_t dest_stride_N
 );
@@ -83,9 +72,6 @@ FmnistCResult
 fmnist_c_load_labels_onehot_f32(
     bool is_train, 
     int64_t num_samples, 
-    int64_t expected_N,
-    int64_t expected_C,
-    int64_t dest_elements,
     float* dest,
     int64_t dest_stride_N, 
     int64_t dest_stride_C

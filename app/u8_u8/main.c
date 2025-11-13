@@ -56,10 +56,6 @@ main() {
     result = fmnist_c_load_images_u8(
         true,
         num_train, 
-        num_train,
-        num_rows, 
-        num_cols,
-        num_rows * num_cols * num_train,
         x_train,
         num_rows * num_cols,
         num_cols,
@@ -72,9 +68,6 @@ main() {
     result = fmnist_c_load_labels_u8(
         true,
         num_train, 
-        num_train,
-        num_labels,
-        num_train,
         y_train,
         1
     );
@@ -82,7 +75,7 @@ main() {
         printf("Failed to load fmnist data\n");
     }
 
-    #define IMAGE_NUM 22
+    #define IMAGE_NUM 25
     int stb_result;
 
     uint8_t* image = x_train + IMAGE_NUM * num_cols * num_rows;

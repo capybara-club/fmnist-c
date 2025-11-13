@@ -56,10 +56,6 @@ main() {
     result = fmnist_c_load_images_f32(
         true,
         num_train, 
-        num_train,
-        num_rows, 
-        num_cols,
-        num_train * num_rows * num_cols,
         x_train,
         num_rows * num_cols,
         num_cols,
@@ -72,9 +68,6 @@ main() {
     result = fmnist_c_load_labels_onehot_f32(
         true,
         num_train, 
-        num_train,
-        num_labels,
-        num_train * num_labels,
         y_train,
         num_labels,
         1
