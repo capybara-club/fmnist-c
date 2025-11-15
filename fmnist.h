@@ -11,6 +11,17 @@
 #define FMNIST_C_PUBLIC_DEF
 #endif
 
+#define fmnistCheck(ans)                                                                        \
+    do {                                                                                        \
+        FmnistCResult _result = (ans);                                                          \
+        if (_result != FMNIST_C_RESULT_SUCCESS) {                                               \
+            const char *error_name = fmnist_c_result_to_string(_result);                        \
+            fprintf(stderr, "fmnistCheck: %s \n  %s %d\n", error_name, __FILE__, __LINE__);     \
+            assert(0);                                                                          \
+            exit(1);                                                                            \
+        }                                                                                       \
+    } while(0)
+
 typedef enum {
     FMNIST_C_RESULT_SUCCESS,
     FMNIST_C_ERROR_CANT_OPEN_FILE,
@@ -20,7 +31,10 @@ typedef enum {
     FMNIST_C_ERROR_INSUFFICIENT_DEST,
     FMNIST_C_ERROR_DIM_MISMATCH,
     FMNIST_C_ERROR_INVALID_DATA,
+    FMNIST_C_RESULT_NUM_ELEMS
 } FmnistCResult;
+
+FMNIST_C_PUBLIC_DEC const char* fmnist_c_result_to_string(FmnistCResult result);
 
 FMNIST_C_PUBLIC_DEC
 FmnistCResult
