@@ -19,9 +19,6 @@ static const char* label_strings[] = {
     "Ankle Boot"
 };
 
-#define STRING(x) #x
-#define XSTRING(x) STRING(x)
-
 int
 main() {
     int64_t num_train, num_test, num_rows, num_cols, num_labels;
@@ -93,7 +90,7 @@ main() {
     }
 
     // Now write the single image
-    stb_result = stbi_write_png( XSTRING(CMAKE_SOURCE_PATH) "/output_uint8_x_train.png", num_cols, num_rows, 1, single_image, num_cols * 1);
+    stb_result = stbi_write_png( CMAKE_SOURCE_PATH "/output_uint8_x_train.png", num_cols, num_rows, 1, single_image, num_cols * 1);
     if (stb_result == 0) {
         printf("Failed to write PNG\n");
     }

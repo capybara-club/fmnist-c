@@ -64,9 +64,9 @@ target_include_directories(
 
 add_custom_target(unzip_fashion_mnist ALL DEPENDS ${OUTPUT_FILES})
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_IMAGES_FILE=${TRAIN_IMAGES_FILE}")
-target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_LABELS_FILE=${TRAIN_LABELS_FILE}")
-target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_IMAGES_FILE=${T10K_IMAGES_FILE}")
-target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_LABELS_FILE=${T10K_LABELS_FILE}")
+target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_IMAGES_FILE=\"${TRAIN_IMAGES_FILE}\"")
+target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_LABELS_FILE=\"${TRAIN_LABELS_FILE}\"")
+target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_IMAGES_FILE=\"${T10K_IMAGES_FILE}\"")
+target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_LABELS_FILE=\"${T10K_LABELS_FILE}\"")
 
 add_subdirectory(app)

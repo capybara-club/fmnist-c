@@ -9,9 +9,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define _FMNIST_C_STRING(x) #x
-#define _FMNIST_C_XSTRING(x) _FMNIST_C_STRING(x)
-
 #define _FMNIST_C_MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define FMNIST_IMAGE_MAGIC 2051
@@ -333,7 +330,7 @@ fmnist_c_dims(
     int64_t x_train_num_samples, x_train_num_rows, x_train_num_cols; 
     result = 
         _fmnist_load_data(
-            _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE),
+            TRAIN_IMAGES_FILE,
             0,
             &x_train_num_samples, 
             &x_train_num_rows,
@@ -351,7 +348,7 @@ fmnist_c_dims(
     int64_t y_train_num_samples, y_train_num_labels; 
     result = 
         _fmnist_load_labels(
-            _FMNIST_C_XSTRING(TRAIN_LABELS_FILE),
+            TRAIN_LABELS_FILE,
             0,
             &y_train_num_samples,
             &y_train_num_labels,
@@ -367,7 +364,7 @@ fmnist_c_dims(
     int64_t x_test_num_samples, x_test_num_rows, x_test_num_cols; 
     result = 
         _fmnist_load_data(
-            _FMNIST_C_XSTRING(T10K_IMAGES_FILE),
+            T10K_IMAGES_FILE,
             0,
             &x_test_num_samples, 
             &x_test_num_rows, 
@@ -385,7 +382,7 @@ fmnist_c_dims(
     int64_t y_test_num_samples, y_test_num_labels; 
     result = 
         _fmnist_load_labels(
-            _FMNIST_C_XSTRING(T10K_LABELS_FILE),
+            T10K_LABELS_FILE,
             0,
             &y_test_num_samples, 
             &y_test_num_labels,
@@ -432,7 +429,7 @@ fmnist_c_load_images_f32(
     int64_t dest_stride_H, 
     int64_t dest_stride_W
 ) {
-    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE) : _FMNIST_C_XSTRING(T10K_IMAGES_FILE);
+    const char* path = is_train ? TRAIN_IMAGES_FILE : T10K_IMAGES_FILE;
     return _fmnist_load_data(
         path,
         num_samples,
@@ -455,7 +452,7 @@ fmnist_c_load_images_u8(
     int64_t dest_stride_H, 
     int64_t dest_stride_W
 ) {
-    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_IMAGES_FILE) : _FMNIST_C_XSTRING(T10K_IMAGES_FILE);
+    const char* path = is_train ? TRAIN_IMAGES_FILE : T10K_IMAGES_FILE;
     return _fmnist_load_data(
         path,
         num_samples,
@@ -476,7 +473,7 @@ fmnist_c_load_labels_u8(
     uint8_t* dest, 
     int64_t dest_stride_N
 ) {
-    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_LABELS_FILE) : _FMNIST_C_XSTRING(T10K_LABELS_FILE);
+    const char* path = is_train ? TRAIN_LABELS_FILE : T10K_LABELS_FILE;
     return _fmnist_load_labels(
         path,
         num_samples,
@@ -497,7 +494,7 @@ fmnist_c_load_labels_onehot_f32(
     int64_t dest_stride_N,
     int64_t dest_stride_C
 ) {
-    const char* path = is_train ? _FMNIST_C_XSTRING(TRAIN_LABELS_FILE) : _FMNIST_C_XSTRING(T10K_LABELS_FILE);
+    const char* path = is_train ? TRAIN_LABELS_FILE : T10K_LABELS_FILE;
     return _fmnist_load_labels(
         path,
         num_samples,

@@ -10,5 +10,5 @@ target_link_libraries(
     fmnist_c
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE "CMAKE_SOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(${PROJECT_NAME} PRIVATE "CMAKE_SOURCE_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
 
