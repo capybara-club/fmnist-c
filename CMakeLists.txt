@@ -69,4 +69,10 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE "TRAIN_LABELS_FILE=\"${TRAIN_
 target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_IMAGES_FILE=\"${T10K_IMAGES_FILE}\"")
 target_compile_definitions(${PROJECT_NAME} PRIVATE "T10K_LABELS_FILE=\"${T10K_LABELS_FILE}\"")
 
-add_subdirectory(app)
+set(FMNISTC_BUILD_APP_DEFAULT ON)
+option(FMNISTC_BUILD_APP "Build fmnist-c app" ${FMNISTC_BUILD_APP_DEFAULT})
+message(STATUS "FMNISTC_BUILD_APP = ${FMNISTC_BUILD_APP}")
+
+if(FMNISTC_BUILD_APP)
+    add_subdirectory(app)
+endif()
